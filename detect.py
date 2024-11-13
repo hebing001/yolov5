@@ -39,9 +39,9 @@ import torch
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
-if str(ROOT) not in sys.path:
+if str(ROOT) not in sys.path:   #sys.path模块查询模块的路径，如果没有则添加
     sys.path.append(str(ROOT))  # add ROOT to PATH
-ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
+ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative 转换成相对路径
 
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 
@@ -66,37 +66,38 @@ from utils.general import (
 from utils.torch_utils import select_device, smart_inference_mode
 
 
+
 @smart_inference_mode()
 def run(
-    weights=ROOT / "yolov5s.pt",  # model path or triton URL
-    source=ROOT / "data/images",  # file/dir/URL/glob/screen/0(webcam)
-    data=ROOT / "data/coco128.yaml",  # dataset.yaml path
-    imgsz=(640, 640),  # inference size (height, width)
-    conf_thres=0.25,  # confidence threshold
-    iou_thres=0.45,  # NMS IOU threshold
-    max_det=1000,  # maximum detections per image
-    device="",  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-    view_img=False,  # show results
-    save_txt=False,  # save results to *.txt
-    save_format=0,  # save boxes coordinates in YOLO format or Pascal-VOC format (0 for YOLO and 1 for Pascal-VOC)
-    save_csv=False,  # save results in CSV format
-    save_conf=False,  # save confidences in --save-txt labels
-    save_crop=False,  # save cropped prediction boxes
-    nosave=False,  # do not save images/videos
-    classes=None,  # filter by class: --class 0, or --class 0 2 3
-    agnostic_nms=False,  # class-agnostic NMS
-    augment=False,  # augmented inference
-    visualize=False,  # visualize features
-    update=False,  # update all models
-    project=ROOT / "runs/detect",  # save results to project/name
-    name="exp",  # save results to project/name
-    exist_ok=False,  # existing project/name ok, do not increment
-    line_thickness=3,  # bounding box thickness (pixels)
-    hide_labels=False,  # hide labels
-    hide_conf=False,  # hide confidences
-    half=False,  # use FP16 half-precision inference
-    dnn=False,  # use OpenCV DNN for ONNX inference
-    vid_stride=1,  # video frame-rate stride
+    weights=ROOT / "yolov5s.pt",  # model path or triton URL 模型路径
+    source=ROOT / "data/images",  # file/dir/URL/glob/screen/0(webcam) 输入源
+    data=ROOT / "data/coco128.yaml",  # dataset.yaml path 数据集路径
+    imgsz=(640, 640),  # inference size (height, width) 推理尺寸
+    conf_thres=0.25,  # confidence threshold 置信度阈值
+    iou_thres=0.45,  # NMS IOU threshold NMS阈值
+    max_det=1000,  # maximum detections per image 每张图片的最大检测数
+    device="",  # cuda device, i.e. 0 or 0,1,2,3 or cpu cuda设备
+    view_img=False,  # show results 显示结果
+    save_txt=False,  # save results to *.txt 保存结果到txt文件
+    save_format=0,  # save boxes coordinates in YOLO format or Pascal-VOC format (0 for YOLO and 1 for Pascal-VOC) 保存坐标格式
+    save_csv=False,  # save results in CSV format 保存结果到CSV文件
+    save_conf=False,  # save confidences in --save-txt labels 保存置信度
+    save_crop=False,  # save cropped prediction boxes 保存裁剪的预测框
+    nosave=False,  # do not save images/videos  不保存图片或视频
+    classes=None,  # filter by class: --class 0, or --class 0 2 3 按类别过滤
+    agnostic_nms=False,  # class-agnostic NMS 是否执行类别无关的 NMS。默认为 False，即按类别执行 NMS。如果为 True，NMS 会忽略类别信息，统一处理所有检测框。
+    augment=False,  # augmented inference 是否执行增强推理
+    visualize=False,  # visualize features 是否可视化特征
+    update=False,  # update all models 更新所有模型
+    project=ROOT / "runs/detect",  # save results to project/name 保存结果的目录
+    name="exp",  # save results to project/name 保存结果的子目录
+    exist_ok=False,  # existing project/name ok, do not increment 如果存在相同的目录，是否覆盖
+    line_thickness=3,  # bounding box thickness (pixels) 边框线的厚度
+    hide_labels=False,  # hide labels 隐藏标签
+    hide_conf=False,  # hide confidences    隐藏置信度
+    half=False,  # use FP16 half-precision inference 是否使用 FP16 半精度推理
+    dnn=False,  # use OpenCV DNN for ONNX inference 是否使用 OpenCV DNN 进行 ONNX 推理
+    vid_stride=1,  # video frame-rate stride 视频帧率步长
 ):
     """
     Runs YOLOv5 detection inference on various sources like images, videos, directories, streams, etc.
@@ -148,12 +149,12 @@ def run(
         run(source='data/videos/example.mp4', weights='yolov5s.pt', conf_thres=0.4, device='0')
         ```
     """
-    source = str(source)
-    save_img = not nosave and not source.endswith(".txt")  # save inference images
-    is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
-    is_url = source.lower().startswith(("rtsp://", "rtmp://", "http://", "https://"))
-    webcam = source.isnumeric() or source.endswith(".streams") or (is_url and not is_file)
-    screenshot = source.lower().startswith("screen")
+    source = str(source)   #输入源
+    save_img = not nosave and not source.endswith(".txt")  # save inference images  保存推理图片
+    is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS) # file or dir  文件或目录
+    is_url = source.lower().startswith(("rtsp://", "rtmp://", "http://", "https://")) # 是不是URL
+    webcam = source.isnumeric() or source.endswith(".streams") or (is_url and not is_file) # webcam
+    screenshot = source.lower().startswith("screen") #屏幕截图
     if is_url and is_file:
         source = check_file(source)  # download
 
@@ -163,9 +164,9 @@ def run(
 
     # Load model
     device = select_device(device)
-    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half)
-    stride, names, pt = model.stride, model.names, model.pt
-    imgsz = check_img_size(imgsz, s=stride)  # check image size
+    model = DetectMultiBackend(weights, device=device, dnn=dnn, data=data, fp16=half) # 加载模型 weights, device, dnn, data, fp16
+    stride, names, pt = model.stride, model.names, model.pt #步长，类别名，模型
+    imgsz = check_img_size(imgsz, s=stride)  # check image size 检查图片尺寸
 
     # Dataloader
     bs = 1  # batch_size
@@ -320,7 +321,7 @@ def run(
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
 
 
-def parse_opt():
+def parse_opt():    #解析命令行参数
     """
     Parse command-line arguments for YOLOv5 detection, allowing custom inference options and model configurations.
 
