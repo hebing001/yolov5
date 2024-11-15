@@ -674,7 +674,7 @@ class DetectMultiBackend(nn.Module):
         if names[0] == "n01440764" and len(names) == 1000:  # ImageNet
             names = yaml_load(ROOT / "data/ImageNet.yaml")["names"]  # human-readable names
 
-        self.__dict__.update(locals())  # assign all variables to self
+        self.__dict__.update(locals())  # assign all variables to self 添加所有局部
 
     def forward(self, im, augment=False, visualize=False):
         """Performs YOLOv5 inference on input images with options for augmentation and visualization."""
@@ -685,7 +685,7 @@ class DetectMultiBackend(nn.Module):
             im = im.permute(0, 2, 3, 1)  # torch BCHW to numpy BHWC shape(1,320,192,3)
 
         if self.pt:  # PyTorch
-            y = self.model(im, augment=augment, visualize=visualize) if augment or visualize else self.model(im)
+            y = self.model(im, augment=augment, visualize=visualize) if augment or visualize else self.model(im)  #调用的是中的forward函数
         elif self.jit:  # TorchScript
             y = self.model(im)
         elif self.dnn:  # ONNX OpenCV DNN

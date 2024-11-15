@@ -181,7 +181,7 @@ def run(
     vid_path, vid_writer = [None] * bs, [None] * bs
 
     # Run inference
-    model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
+    model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup   
     seen, windows, dt = 0, [], (Profile(device=device), Profile(device=device), Profile(device=device))
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
@@ -189,8 +189,8 @@ def run(
             im = im.half() if model.fp16 else im.float()  # uint8 to fp16/32
             im /= 255  # 0 - 255 to 0.0 - 1.0
             if len(im.shape) == 3:
-                im = im[None]  # expand for batch dim
-            if model.xml and im.shape[0] > 1:
+                im = im[None]  # expand for batch dim  插入一个维度
+            if model.xml and im.shape[0] > 1: 
                 ims = torch.chunk(im, im.shape[0], 0)
 
         # Inference
@@ -207,8 +207,8 @@ def run(
             else:
                 pred = model(im, augment=augment, visualize=visualize)
         # NMS
-        with dt[2]:
-            pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic_nms, max_det=max_det)
+        with dt[2]: # agnostic_nms true
+            pred = non_max_suppression(pred, conf_thres, iou_thres, classes, agnostic = True, max_det=max_det)   # bus 640 * 480
 
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
@@ -234,6 +234,9 @@ def run(
                 s += f"{i}: "
             else:
                 p, im0, frame = path, im0s.copy(), getattr(dataset, "frame", 0)
+                #打印原始图片的尺寸
+                LOGGER.info(f"image {p} ({im0.shape[0]}x{im0.shape[1]}) {frame + 1}/{len(dataset)}")
+
 
             p = Path(p)  # to Path
             save_path = str(save_dir / p.name)  # im.jpg
@@ -252,7 +255,7 @@ def run(
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
-                for *xyxy, conf, cls in reversed(det):
+                for *xyxy, conf, cls in reversed(det): #概率小的先输出
                     c = int(cls)  # integer class
                     label = names[c] if hide_conf else f"{names[c]}"
                     confidence = float(conf)
@@ -310,6 +313,8 @@ def run(
 
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+
+        
 
     # Print results
     t = tuple(x.t / seen * 1e3 for x in dt)  # speeds per image

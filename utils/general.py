@@ -1037,13 +1037,13 @@ def non_max_suppression(
         prediction = prediction.cpu()
     bs = prediction.shape[0]  # batch size
     nc = prediction.shape[2] - nm - 5  # number of classes
-    xc = prediction[..., 4] > conf_thres  # candidates
+    xc = prediction[..., 4] > conf_thres  # candidates 筛选出置信度大于阈值的
 
     # Settings
     # min_wh = 2  # (pixels) minimum box width and height
-    max_wh = 7680  # (pixels) maximum box width and height
-    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()
-    time_limit = 0.5 + 0.05 * bs  # seconds to quit after
+    max_wh = 7680  # (pixels) maximum box width and height  最高宽度和高度
+    max_nms = 30000  # maximum number of boxes into torchvision.ops.nms()  进入最大的nms的框数
+    time_limit = 0.5 + 0.05 * bs  # seconds to quit after 
     redundant = True  # require redundant detections
     multi_label &= nc > 1  # multiple labels per box (adds 0.5ms/img)
     merge = False  # use merge-NMS
@@ -1054,9 +1054,9 @@ def non_max_suppression(
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
         # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0  # width-height
-        x = x[xc[xi]]  # confidence
+        x = x[xc[xi]]  # 根据 confidence 取下留下的框框
 
-        # Cat apriori labels if autolabelling
+        # Cat apriori labels if autolabelling 
         if labels and len(labels[xi]):
             lb = labels[xi]
             v = torch.zeros((len(lb), nc + nm + 5), device=x.device)
@@ -1070,11 +1070,11 @@ def non_max_suppression(
             continue
 
         # Compute conf
-        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf
+        x[:, 5:] *= x[:, 4:5]  # conf = obj_conf * cls_conf 将置信度乘以类别置信度 计算出每个类别的置信度
 
         # Box/Mask
-        box = xywh2xyxy(x[:, :4])  # center_x, center_y, width, height) to (x1, y1, x2, y2)
-        mask = x[:, mi:]  # zero columns if no masks
+        box = xywh2xyxy(x[:, :4])  # center_x, center_y, width, height) to (x1, y1, x2, y2) 将中心点坐标转换为左上角和右下角坐标
+        mask = x[:, mi:]  # zero columns if no masks 如果没有mask，就是0
 
         # Detections matrix nx6 (xyxy, conf, cls)
         if multi_label:
@@ -1084,8 +1084,8 @@ def non_max_suppression(
             conf, j = x[:, 5:mi].max(1, keepdim=True)
             x = torch.cat((box, conf, j.float(), mask), 1)[conf.view(-1) > conf_thres]
 
-        # Filter by class
-        if classes is not None:
+        # Filter by class  根据类别筛选方框
+        if classes is not None: #该参数可以用来指定需要筛选的类别。如果 classes 被指定为一个列表，它只会保留这些类别的框。
             x = x[(x[:, 5:6] == torch.tensor(classes, device=x.device)).any(1)]
 
         # Apply finite constraint
@@ -1100,8 +1100,8 @@ def non_max_suppression(
 
         # Batched NMS
         c = x[:, 5:6] * (0 if agnostic else max_wh)  # classes
-        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores
-        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS
+        boxes, scores = x[:, :4] + c, x[:, 4]  # boxes (offset by class), scores 真的牛逼为了不让类别之间的框相互干扰，将类别的偏移加到了框上 牛逼 不走寻常路啊
+        i = torchvision.ops.nms(boxes, scores, iou_thres)  # NMS 非极大值抑制
         i = i[:max_det]  # limit detections
         if merge and (1 < n < 3e3):  # Merge NMS (boxes merged using weighted mean)
             # update boxes as boxes(i,4) = weights(i,n) * boxes(n,4)
