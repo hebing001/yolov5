@@ -80,20 +80,20 @@ class Detect(nn.Module):
         """Initializes YOLOv5 detection layer with specified classes, anchors, channels, and inplace operations."""
         super().__init__()
         self.nc = nc  # number of classes
-        self.no = nc + 5  # number of outputs per anchor
-        self.nl = len(anchors)  # number of detection layers
-        self.na = len(anchors[0]) // 2  # number of anchors
-        self.grid = [torch.empty(0) for _ in range(self.nl)]  # init grid
-        self.anchor_grid = [torch.empty(0) for _ in range(self.nl)]  # init anchor grid
-        self.register_buffer("anchors", torch.tensor(anchors).float().view(self.nl, -1, 2))  # shape(nl,na,2)
-        self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1) for x in ch)  # output conv
-        self.inplace = inplace  # use inplace ops (e.g. slice assignment)
+        self.no = nc + 5  # number of outputs per anchor 一个框的输出 85 位置4 + 有东西的概率 + 每个类别概率
+        self.nl = len(anchors)  # number of detection layers 多少个检测层
+        self.na = len(anchors[0]) // 2  # number of anchors  一个检测层有多少个锚点
+        self.grid = [torch.empty(0) for _ in range(self.nl)]  # init grid 初始化网格
+        self.anchor_grid = [torch.empty(0) for _ in range(self.nl)]  # init anchor grid 初始化锚点网格
+        self.register_buffer("anchors", torch.tensor(anchors).float().view(self.nl, -1, 2))  # shape(nl,na,2) 注册缓冲区
+        self.m = nn.ModuleList(nn.Conv2d(x, self.no * self.na, 1) for x in ch)  # output conv 输出 3个卷积层  85*3
+        self.inplace = inplace  # use inplace ops (e.g. slice assignment) 使用原地操作
 
     def forward(self, x):
         """Processes input through YOLOv5 layers, altering shape for detection: `x(bs, 3, ny, nx, 85)`."""
         z = []  # inference output
         for i in range(self.nl):
-            x[i] = self.m[i](x[i])  # conv
+            x[i] = self.m[i](x[i])  # 卷积层输出 85*3
             bs, _, ny, nx = x[i].shape  # x(bs,255,20,20) to x(bs,3,20,20,85)
             x[i] = x[i].view(bs, self.na, self.no, ny, nx).permute(0, 1, 3, 4, 2).contiguous()
 
@@ -162,12 +162,12 @@ class BaseModel(nn.Module):
         """Performs a forward pass on the YOLOv5 model, enabling profiling and feature visualization options."""
         y, dt = [], []  # outputs
         for m in self.model:
-            if m.f != -1:  # if not from previous layer
-                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers
+            if m.f != -1:  # if not from previous layer # 如果不是从前一层来的
+                x = y[m.f] if isinstance(m.f, int) else [x if j == -1 else y[j] for j in m.f]  # from earlier layers 从前面的层来                  # 如果是从前一层来的，x就是前一层的输出，如果不是，x就是 x 加上前一层的输出的某个部分   
             if profile:
                 self._profile_one_layer(m, x, dt)
-            x = m(x)  # run
-            y.append(x if m.i in self.save else None)  # save output
+            x = m(x)  # run 运行
+            y.append(x if m.i in self.save else None)  # save output 保存输出
             if visualize:
                 feature_visualization(x, m.type, m.i, save_dir=visualize)
         return x
@@ -234,10 +234,10 @@ class DetectionModel(BaseModel):
         ch = self.yaml["ch"] = self.yaml.get("ch", ch)  # input channels
         if nc and nc != self.yaml["nc"]:
             LOGGER.info(f"Overriding model.yaml nc={self.yaml['nc']} with nc={nc}")
-            self.yaml["nc"] = nc  # override yaml value
+            self.yaml["nc"] = nc  # override yaml value 覆盖掉yaml文件中的nc值
         if anchors:
             LOGGER.info(f"Overriding model.yaml anchors with anchors={anchors}")
-            self.yaml["anchors"] = round(anchors)  # override yaml value
+            self.yaml["anchors"] = round(anchors)  # override yaml value 覆盖掉yaml文件中的anchors值
         self.model, self.save = parse_model(deepcopy(self.yaml), ch=[ch])  # model, savelist
         self.names = [str(i) for i in range(self.yaml["nc"])]  # default names
         self.inplace = self.yaml.get("inplace", True)
@@ -254,7 +254,7 @@ class DetectionModel(BaseModel):
             m.inplace = self.inplace
             m.stride = torch.tensor([s / x.shape[-2] for x in _forward(torch.zeros(1, ch, s, s))])  # forward
             check_anchor_order(m)
-            m.anchors /= m.stride.view(-1, 1, 1)
+            m.anchors /= m.stride.view(-1, 1, 1)  #归一化锚点 anchors /= stride
             self.stride = m.stride
             self._initialize_biases()  # only run once
 
@@ -267,7 +267,7 @@ class DetectionModel(BaseModel):
         """Performs single-scale or augmented inference and may include profiling or visualization."""
         if augment:
             return self._forward_augment(x)  # augmented inference, None
-        return self._forward_once(x, profile, visualize)  # single-scale inference, train
+        return self._forward_once(x, profile, visualize)  # single-scale inference, train  # 单尺度推理，训练
 
     def _forward_augment(self, x):
         """Performs augmented inference across different scales and flips, returning combined detections."""
@@ -322,8 +322,8 @@ class DetectionModel(BaseModel):
         """
         # cf = torch.bincount(torch.tensor(np.concatenate(dataset.labels, 0)[:, 0]).long(), minlength=nc) + 1.
         m = self.model[-1]  # Detect() module
-        for mi, s in zip(m.m, m.stride):  # from
-            b = mi.bias.view(m.na, -1)  # conv.bias(255) to (3,85)
+        for mi, s in zip(m.m, m.stride):  # from   # mi是卷积层，s是步长
+            b = mi.bias.view(m.na, -1)  # conv.bias(255) to (3,85)    卷积是 255 * 1 * 1   bias 是 255
             b.data[:, 4] += math.log(8 / (640 / s) ** 2)  # obj (8 objects per 640 image)
             b.data[:, 5 : 5 + m.nc] += (
                 math.log(0.6 / (m.nc - 0.99999)) if cf is None else torch.log(cf / cf.sum())
@@ -331,7 +331,8 @@ class DetectionModel(BaseModel):
             mi.bias = torch.nn.Parameter(b.view(-1), requires_grad=True)
 
 
-Model = DetectionModel  # retain YOLOv5 'Model' class for backwards compatibility
+Model = DetectionModel  # retain YOLOv5 'Model' class for backwards compatibility  为了向后兼容，保留YOLOv5“Model”类
+
 
 
 class SegmentationModel(DetectionModel):
@@ -374,7 +375,7 @@ class ClassificationModel(BaseModel):
         self.model = None
 
 
-def parse_model(d, ch):
+def parse_model(d, ch): # yolov5s.yaml ch=[3]
     """Parses a YOLOv5 model from a dict `d`, configuring layers based on input channels `ch` and model architecture."""
     LOGGER.info(f"\n{'':>3}{'from':>18}{'n':>3}{'params':>10}  {'module':<40}{'arguments':<30}")
     anchors, nc, gd, gw, act, ch_mul = (
@@ -390,17 +391,17 @@ def parse_model(d, ch):
         LOGGER.info(f"{colorstr('activation:')} {act}")  # print
     if not ch_mul:
         ch_mul = 8
-    na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors  # number of anchors
-    no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)
+    na = (len(anchors[0]) // 2) if isinstance(anchors, list) else anchors  # number of anchors 3
+    no = na * (nc + 5)  # number of outputs = anchors * (classes + 5)   每一个框的输出 85 位置 + 东西的概率 + 类别概率 + 4个坐标
 
-    layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out
-    for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args
-        m = eval(m) if isinstance(m, str) else m  # eval strings
-        for j, a in enumerate(args):
-            with contextlib.suppress(NameError):
-                args[j] = eval(a) if isinstance(a, str) else a  # eval strings
+    layers, save, c2 = [], [], ch[-1]  # layers, savelist, ch out   层数，保存列表，ch输出
+    for i, (f, n, m, args) in enumerate(d["backbone"] + d["head"]):  # from, number, module, args 从哪里来，重复次数，模块，参数
+        m = eval(m) if isinstance(m, str) else m  # eval strings # 转换为类
+        for j, a in enumerate(args): # [64, 6, 2, 2]
+            with contextlib.suppress(NameError): 
+                args[j] = eval(a) if isinstance(a, str) else a  # eval strings args是最后一个参数，也就是模块的参数 步长，卷积核大小等
 
-        n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain
+        n = n_ = max(round(n * gd), 1) if n > 1 else n  # depth gain  这个n是第2个参数的值，也就是重复次数
         if m in {
             Conv,
             GhostConv,
@@ -421,14 +422,14 @@ def parse_model(d, ch):
             DWConvTranspose2d,
             C3x,
         }:
-            c1, c2 = ch[f], args[0]
-            if c2 != no:  # if not output
-                c2 = make_divisible(c2 * gw, ch_mul)
+            c1, c2 = ch[f], args[0]    # ch[f]是输入通道数，args[0]是输出通道数
+            if c2 != no:  # if not output   这里 no 85
+                c2 = make_divisible(c2 * gw, ch_mul) #将 c2 乘以 gw 后，通过 make_divisible 函数将结果调整为 ch_mul 的倍数。
 
-            args = [c1, c2, *args[1:]]
+            args = [c1, c2, *args[1:]]   # 拼接所有参数  输入通道数，输出通道数，其他参数
             if m in {BottleneckCSP, C3, C3TR, C3Ghost, C3x}:
-                args.insert(2, n)  # number of repeats
-                n = 1
+                args.insert(2, n)  # number of repeats 为了C3插入Bneck 的次数
+                n = 1   # 重复次数为1 就是添加一个这个模块
         elif m is nn.BatchNorm2d:
             args = [ch[f]]
         elif m is Concat:
@@ -439,7 +440,7 @@ def parse_model(d, ch):
             if isinstance(args[1], int):  # number of anchors
                 args[1] = [list(range(args[1] * 2))] * len(f)
             if m is Segment:
-                args[3] = make_divisible(args[3] * gw, ch_mul)
+                args[3] = make_divisible(args[3] * gw, ch_mul) #
         elif m is Contract:
             c2 = ch[f] * args[0] ** 2
         elif m is Expand:
@@ -448,15 +449,15 @@ def parse_model(d, ch):
             c2 = ch[f]
 
         m_ = nn.Sequential(*(m(*args) for _ in range(n))) if n > 1 else m(*args)  # module
-        t = str(m)[8:-2].replace("__main__.", "")  # module type
-        np = sum(x.numel() for x in m_.parameters())  # number params
+        t = str(m)[8:-2].replace("__main__.", "")  # module type # 去掉前面的__main__.和后面的>
+        np = sum(x.numel() for x in m_.parameters())  # number params 参数数量
         m_.i, m_.f, m_.type, m_.np = i, f, t, np  # attach index, 'from' index, type, number params
         LOGGER.info(f"{i:>3}{str(f):>18}{n_:>3}{np:10.0f}  {t:<40}{str(args):<30}")  # print
         save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # append to savelist
         layers.append(m_)
         if i == 0:
             ch = []
-        ch.append(c2)
+        ch.append(c2)  #c2 是输出通道数
     return nn.Sequential(*layers), sorted(save)
 
 
